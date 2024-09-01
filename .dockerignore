@@ -1,0 +1,19 @@
+# Ignore Python bytecode files
+__pycache__
+*.pyc
+
+# Ignore the static audio folder
+static/audio/
+
+# Ignore other unnecessary files and directories
+*.log
+*.sqlite3
+instance/
+tests/
+venv/
+env/
+.idea/
+.vscode/
+.DS_Store
+*.swp
+./static/audio/*

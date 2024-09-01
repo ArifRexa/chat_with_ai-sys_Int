@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Translation and Transcription Service</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: url('https://arcticcoast.no/application/files/3814/7186/7371/Sami_200022.jpg') center/cover no-repeat;
+            color: #333;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            width: 90%;
+            max-width: 1200px;
+            padding: 20px;
+            margin-top: 20px;
+            background-color: rgba(255, 255, 255, 0.95); /* slightly transparent white */
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+        }
+
+        .section {
+            width: 45%;
+            margin: 10px;
+        }
+        textarea, input, button, select {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+        }
+        button {
+            background-color: #4a77d4;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #3561a7;
+        }
+        h2 {
+            color: #004d99;
+        }
+        .footer {
+            width: 100%;
+            position: fixed;
+            bottom: 0;
+            padding: 10px 0;
+            background-color: #f8f9fa;
+            text-align: center;
+            font-size: 16px;
+            color: #666;
+            box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            width: 100%;
+            margin-bottom: 20px; /* Space below the header */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Northern Sámi 🚀 AI</h1>
+            <a href="/process_audio_chat" style="background-color: #4a77d4; height: 10%; width: 10%; padding: 10px; color: white; border-radius: 5px; text-decoration: None;">Integrated Service</a>
+        </div>
+
+        <div class="section">
+            <h2>Transcribe Audio</h2>
+            <input type="file" id="audioFile" accept="audio/*">
+            <button onclick="uploadAudio()">Transcribe Audio</button>
+            <p id="transcriptionResult"></p>
+
+            <h2>Text to Speech Conversion</h2>
+            <textarea id="textInput" placeholder="Enter text here..."></textarea>
+            <button onclick="convertTextToSpeech()">Convert to Speech</button>
+            <audio id="audioPlayer" controls hidden></audio>
+        </div>
+        <div class="section">
+            <h2>Translate Text</h2>
+            <textarea id="textToTranslate" placeholder="Enter text to translate"></textarea>
+            <select id="sourceLang">
+                <option value="nor">Norwegian</option>
+                <option value="sme">Northern Sami</option>
+                <option value="eng">English</option>
+            </select>
+            <select id="targetLang">
+                <option value="eng">English</option>
+                <option value="nor">Norwegian</option>
+                <option value="sme">Northern Sami</option>
+            </select>
+            <button onclick="translateText()">Translate</button>
+            <p id="translationResult"></p>
+
+            <h2>Chat with OpenAI</h2>
+            <textarea id="chatInput" placeholder="Enter your question"></textarea>
+            <button onclick="chatWithOpenAI()">Send</button>
+            <p id="chatResult"></p>
+        </div>
+    </div>
+    <footer class="footer">
+        © 2024 Northern Sami. All rights reserved.
+    </footer>
+
+    <script>
+        function uploadAudio() {
+            var formData = new FormData();
+            var audioFile = document.getElementById('audioFile').files[0];
+            if (!audioFile) {
+                alert('Please select an audio file first.');
+                return;
+            }
+            formData.append('file', audioFile);
+            fetch('/transcribe', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json())
+            .then(data => {
+                document.getElementById('transcriptionResult').innerText = data['Transcribed Text'] || 'No transcription available.';
+            }).catch(error => {
+                console.error('Error:', error);
+                document.getElementById('transcriptionResult').innerText = 'Error processing the audio.';
+            });
+        }
+
+        function convertTextToSpeech() {
+            const text = document.getElementById('textInput').value;
+            if (!text.trim()) {
+                alert('Please enter some text before submitting.');
+                return;
+            }
+            fetch('/tts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text })
+            }).then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                // Wait for the audio file to be ready (this could be improved with a more robust solution)
+                setTimeout(() => {
+                    const audioUrl = `/audio/${data.filename}`;
+                    console.log(audioUrl)
+                    const audioPlayer = document.getElementById('audioPlayer');
+                    audioPlayer.src = audioUrl;
+                    audioPlayer.hidden = false;
+                    audioPlayer.play();
+                }, 5000);  // Adjust this delay as necessary
+            }).catch(error => {
+                console.error('Error:', error);
+                alert('Failed to convert text to speech.');
+            });
+        }
+
+        function translateText() {
+            const text = document.getElementById('textToTranslate').value;
+            const sourceLang = document.getElementById('sourceLang').value;
+            const targetLang = document.getElementById('targetLang').value;
+            if (!text.trim()) {
+                alert('Please enter some text to translate.');
+                return;
+            }
+            fetch('/translate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: text, source_lang: sourceLang, target_lang: targetLang })
+            }).then(response => response.json())
+            .then(data => {
+                document.getElementById('translationResult').innerText = data['Translated Text'] || 'No translation available.';
+            }).catch(error => {
+                console.error('Error:', error);
+                document.getElementById('translationResult').innerText = 'Error translating the text.';
+            });
+        }
+
+        function chatWithOpenAI() {
+        const text = document.getElementById('chatInput').value;
+        if (!text.trim()) {
+            alert('Please enter a question.');
+            return;
+        }
+        fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: text })
+        }).then(response => response.json())
+        .then(data => {
+            const chatResult = data['ChatGPT Response'] || 'No response from ChatGPT.';
+            console.log(`Received ChatGPT Response: ${chatResult}`);  // Logging the response
+            document.getElementById('chatResult').innerText = chatResult;
+        }).catch(error => {
+            console.error('Error:', error);
+            document.getElementById('chatResult').innerText = 'Failed to chat with AI.';
+        });
+    }
+    </script>
+</body>
+</html>

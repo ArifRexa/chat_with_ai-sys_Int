@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Translation and Transcription Service</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: url('https://arcticcoast.no/application/files/3814/7186/7371/Sami_200022.jpg') center/cover no-repeat;
+            color: #333;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            width: 90%;
+            max-width: 1200px;
+            padding: 20px;
+            margin-top: 20px;
+            background-color: rgba(255, 255, 255, 0.95); /* slightly transparent white */
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .section {
+            width: 45%;
+            margin: 10px;
+        }
+
+        textarea, input, button, select {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+            border: 2px solid #ccc;
+            border-radius: 5px;
+        }
+
+        button {
+            background-color: #4a77d4;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #3561a7;
+        }
+
+        button:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+        }
+
+        h2 {
+            color: #004d99;
+        }
+
+        .footer {
+            width: 100%;
+            position: fixed;
+            bottom: 0;
+            padding: 10px 0;
+            background-color: #f8f9fa;
+            text-align: center;
+            font-size: 16px;
+            color: #666;
+            box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            width: 100%;
+            margin-bottom: 20px; /* Space below the header */
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .toggle_button {
+            width: 15%;
+            margin-right: 10px;
+        }
+
+        .alignment_rec {
+            display: flex;
+        }
+
+        .recording {
+            color: red;
+            font-weight: bold;
+        }
+
+        .loader {
+            border: 16px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 16px solid #3498db;
+            width: 60px;
+            height: 60px;
+            animation: spin 2s linear infinite;
+            margin: auto;
+            /*display: block;*/
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>Northern Sámi 🚀 AI</h1>
+        <a href="/" style="background-color: #4a77d4; height: 10%; width: 10%; padding: 10px; color: white; border-radius: 5px; text-decoration: None;">Home</a>
+    </div>
+
+    <div class="section">
+        <h2>Transcribe Audio</h2>
+        <h4>Audio Recorder</h4>
+        <div class="alignment_rec">
+            <button id="startBtn" class="toggle_button">Start Recording</button>
+            <button id="stopBtn" class="toggle_button hidden">Stop Recording</button>
+            <audio id="audioPlayback" controls></audio>
+            <div id="recordingEffect" class="hidden recording">Recording...</div>
+        </div>
+        <input type="file" id="audioFile" accept="audio/*">
+        <h4>Image Upload</h4>
+        <input type="file" id="imageFileInput" accept="image/*">
+        <textarea rows="3" cols="1" placeholder="ChatGPT prompt Text" id="chatgpt-prompt"></textarea>
+        <button onclick="uploadAudio()">Submit Audio</button>
+    </div>
+
+    <div class="section">
+        <h2>Processed Response Audio</h2>
+        <div id="loader" class="loader hidden"></div>
+        <p>Transcribed Text: <span id="transcribedText"></span></p>
+        <p>Translated Text: <span id="translatedText"></span></p>
+        <p>ChatGPT Response: <span id="chatResponse"></span></p>
+        <p>Translated ChatGPT Response: <span id="translatedChatResponse"></span></p>
+        <audio id="audioPlayer" controls hidden>Generated Audio: </audio>
+    </div>
+</div>
+<footer class="footer">
+    © 2024 Northern Sami. All rights reserved.
+</footer>
+
+<script>
+    let mediaRecorder;
+    let recordedChunks = [];
+
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const audioFileInput = document.getElementById('audioFile');
+    const recordingEffect = document.getElementById('recordingEffect');
+    const imageFileInput = document.getElementById('imageFile');
+    const audioPlayback = document.getElementById('audioPlayback');
+    const transcribedTextElem = document.getElementById('transcribedText');
+
+    const translatedTextElem = document.getElementById('translatedText');
+    const chatResponseElem = document.getElementById('chatResponse');
+    const translatedChatResponseElem = document.getElementById('translatedChatResponse');
+
+    startBtn.addEventListener('click', () => {
+        navigator.permissions.query({name: 'microphone'}).then(permissionStatus => {
+            if (permissionStatus.state === 'granted') {
+                startRecording();
+            } else if (permissionStatus.state === 'prompt') {
+                requestMicrophonePermission();
+            } else {
+                alert('Microphone access is denied. Please enable it in your browser settings.');
+            }
+        }).catch(error => {
+            console.error('Permission error:', error);
+            alert('Permission error. Please check your browser settings.');
+        });
+    });
+
+    stopBtn.addEventListener('click', () => {
+        mediaRecorder.stop();
+        startBtn.classList.remove('hidden');
+        stopBtn.classList.add('hidden');
+        recordingEffect.classList.add('hidden');
+        audioFileInput.disabled = true;  // Enable file upload
+    });
+
+    audioFileInput.addEventListener('change', () => {
+        if (audioFileInput.files.length > 0) {
+            startBtn.disabled = true;  // Disable recording buttons
+            stopBtn.disabled = true;
+        } else {
+            startBtn.disabled = false;
+            stopBtn.disabled = false;
+        }
+    });
+    function updateButtonStyles() {
+        if (startBtn.disabled) {
+            startBtn.style.backgroundColor = '#aaa';
+            startBtn.style.cursor = 'not-allowed';
+        } else {
+            startBtn.style.backgroundColor = '#4a77d4';
+            startBtn.style.cursor = 'pointer';
+        }
+        if (stopBtn.disabled) {
+            stopBtn.style.backgroundColor = '#aaa';
+            stopBtn.style.cursor = 'not-allowed';
+        } else {
+            stopBtn.style.backgroundColor = '#4a77d4';
+            stopBtn.style.cursor = 'pointer';
+        }
+    }
+
+    function requestMicrophonePermission() {
+        navigator.mediaDevices.getUserMedia({audio: true})
+            .then(stream => {
+                stream.getTracks().forEach(track => track.stop());  // Close the stream immediately
+                startRecording();
+            })
+            .catch(error => {
+                console.error('Error accessing microphone:', error);
+                alert('Error accessing microphone.');
+            });
+    }
+
+    function startRecording() {
+        navigator.mediaDevices.getUserMedia({audio: true})
+            .then(stream => {
+                mediaRecorder = new MediaRecorder(stream);
+                recordedChunks = [];  // Reset recordedChunks for a new recording session
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                        console.log('Data available:', event.data);
+                    }
+                };
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(recordedChunks, {type: 'audio/wav'});
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioPlayback.src = audioUrl;
+                    audioPlayback.hidden = false;
+                    console.log('Recording stopped, audio URL:', audioUrl);
+                };
+                mediaRecorder.start();
+                startBtn.classList.add('hidden');
+                stopBtn.classList.remove('hidden');
+                recordingEffect.classList.remove('hidden');
+                audioFileInput.disabled = true;  // Disable file upload
+                console.log('Recording started');
+            })
+            .catch(error => {
+                console.error('Error accessing microphone:', error);
+                alert('Error accessing microphone.');
+            });
+    }
+
+    function uploadAudio() {
+        const formData = new FormData();
+        const imageFileInput = document.getElementById('imageFileInput');
+        const prompt = document.getElementById('chatgpt-prompt').value;
+        const loader = document.getElementById('loader');
+        loader.classList.remove('hidden');
+
+        if (audioFileInput.files.length > 0) {
+            formData.append('file', audioFileInput.files[0]);
+        } else if (recordedChunks.length > 0) {
+            const audioBlob = new Blob(recordedChunks, {type: 'audio/wav'});
+            formData.append('file', audioBlob, 'recorded_audio.wav');
+            console.log('Recorded audio file appended:', audioBlob);
+        } else if (imageFileInput.files.length > 0) { // Check if an image file is selected
+        formData.append('file', imageFileInput.files[0]);
+        } else {
+                alert('Please select or record an audio file first.');
+                loader.classList.add('hidden');
+                return;
+        }
+
+        formData.append('lang', 'sme');
+        console.log('prompt', prompt, typeof(prompt))
+        if (prompt.trim() !== "") {
+        console.log('prompt', prompt, typeof(prompt))
+        formData.append('prompt', prompt);
+    }
+        fetch('/process_audio_chat', {
+            method: 'POST',
+            body: formData
+        }).then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                pollForAudio(data);
+
+            }).catch(error => {
+                console.error('Error:', error);
+                alert('Failed to process audio.');
+                loader.classList.add('hidden');
+            });
+    }
+
+    function pollForAudio(data) {
+        const audioUrl = `/audio/${data.filename}`;
+        const audioPlayer = document.getElementById('audioPlayer');
+
+        const intervalId = setInterval(() => {
+            fetch(audioUrl, {method: 'HEAD'})
+                .then(response => {
+                    if (response.ok) {
+                        clearInterval(intervalId);
+                        // Update UI with processed response
+                        transcribedTextElem.textContent = data.transcribed_text || '';
+
+                        translatedTextElem.textContent = data.translated_text || '';
+                        chatResponseElem.textContent = data.chat_response || '';
+                        translatedChatResponseElem.textContent = data.translated_chat_response || '';
+                        audioPlayer.src = audioUrl;
+                        audioPlayer.hidden = false;
+                        audioPlayer.play();
+                        document.getElementById('loader').classList.add('hidden');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error checking audio file:', error);
+                    document.getElementById('loader').classList.add('hidden');
+                });
+        }, 8000);  // Check every 8 seconds
+    }
+</script>
+</body>
+</html>

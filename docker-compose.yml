@@ -1,0 +1,19 @@
+version: '3.10'
+
+services:
+  web:
+    build: .
+    container_name: 'system_integration'
+    command: gunicorn --bind 0.0.0.0:5000 wsgi:app
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+      - ACAPELA_EMAIL=${ACAPELA_EMAIL}
+      - ACAPELA_PASSWORD=${ACAPELA_PASSWORD}
+    env_file:
+      - .env
+    volumes:
+      - .:/app
